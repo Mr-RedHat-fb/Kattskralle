@@ -227,7 +227,7 @@ function addPreviewsToPosts() {
         
         const availableColors = colors.filter(color => !usedColors.has(color));
         if (availableColors.length === 0) {
-
+            // If all colors are used, start reusing but with transparency
             return colors[Math.floor(Math.random() * colors.length)] + '80';
         }
         
