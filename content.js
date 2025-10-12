@@ -31,6 +31,10 @@ let ignoreraSetting = false;
 let previewsSetting = false;
 let infiniteScrollSetting = false;
 let bypassLeavingSetting = false;
+let threadStarterTagSetting = false;
+let threadStarterName = null;
+let tsCache = null;
+let tsFetchInProgress = false;
 const fetchQueue = [];
 let isFetching = false;
 let scrollTimeout;
@@ -57,45 +61,48 @@ function tryTriggerForwardLoad(preloadMargin = 800) {
     }
 }
 //On first load, ensure settings exist, then load settings and start main
+
 function ensureDefaultSettings(callback) {
     const defaultSettings = {
         'Ignorera': true,
         'Previews': true,
         'Infinite Scroll': true,
-        'Bypass Leaving Site': true
+        'Bypass Leaving Site': true,
+        'Highlight thread starter (TS)': true
     };
 
-    function saveDefaultsToChrome() {
+    function mergeAndSave(existing, done) {
+        const updated = Object.assign({}, defaultSettings, existing || {});
+        const equal = JSON.stringify(updated) === JSON.stringify(existing || {});
         if (typeof chrome !== 'undefined' && chrome.storage?.sync) {
-            chrome.storage.sync.set({ userStorageFbqol: defaultSettings }, callback);
+            if (!equal) {
+                chrome.storage.sync.set({ userStorageFbqol: updated }, done);
+            } else {
+                done();
+            }
         } else if (typeof browser !== 'undefined' && browser.storage?.local) {
-            browser.storage.local.set({ userStorageFbqol: defaultSettings }).then(callback);
+            if (!equal) {
+                browser.storage.local.set({ userStorageFbqol: updated }).then(done);
+            } else {
+                done();
+            }
         } else {
-            callback();
+            done();
         }
     }
 
     if (typeof chrome !== 'undefined' && chrome.storage?.sync) {
         chrome.storage.sync.get('userStorageFbqol', (result) => {
-            if (!result.userStorageFbqol || Object.keys(result.userStorageFbqol).length === 0) {
-                saveDefaultsToChrome();
-            } else {
-                callback();
-            }
+            mergeAndSave(result.userStorageFbqol, callback);
         });
     } else if (typeof browser !== 'undefined' && browser.storage?.local) {
         browser.storage.local.get('userStorageFbqol').then(result => {
-            if (!result.userStorageFbqol || Object.keys(result.userStorageFbqol).length === 0) {
-                saveDefaultsToChrome();
-            } else {
-                callback();
-            }
+            mergeAndSave(result.userStorageFbqol, callback);
         });
     } else {
         callback();
     }
 }
-
 
 function loadSettings() {
     if (typeof chrome !== 'undefined' && chrome.storage?.sync) {
@@ -118,8 +125,9 @@ function applySettings(settings) {
     previewsSetting = !!settings['Previews'];
     infiniteScrollSetting = !!settings['Infinite Scroll'];
     bypassLeavingSetting = !!settings['Bypass Leaving Site'];
+    threadStarterTagSetting = !!(settings['Highlight thread starter (TS)'] || settings['Markera trådskapare (ts)']);
 
-    if (!infiniteScrollSetting && !previewsSetting && !ignoreraSetting && !bypassLeavingSetting) {
+    if (!infiniteScrollSetting && !previewsSetting && !ignoreraSetting && !bypassLeavingSetting && !threadStarterTagSetting) {
         return;// Early exit if all settings are false
     }
     main();//only call main if any settings are activated. 
@@ -174,7 +182,14 @@ function findPosts(){
             };
             if (previewsSetting===true){
                 addPreviewsToPosts();
-            }
+
+    if (threadStarterTagSetting) {
+        ensureThreadStarterKnown(function() {
+            ensureTsStyles();
+            addTsBadgeToUserElements();
+        });
+    }
+}
         })
     }
 }
@@ -774,7 +789,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 });
 
-
 function addPageNumberToPosts(postsHtmlToAddPageNumbersTo, pageNumberToAdd) {
     //console.log("Adding page number to posts: page " + pageNumberToAdd);
     const parser = new DOMParser();
@@ -837,7 +851,14 @@ function addPostsToDom(postsToAdd){
                 const userName = userEl ? userEl.textContent.trim() : null;
                 if (userName && users.includes(userName)) {
                     return; // ignorera detta nya inlägg
-                }
+
+    if (threadStarterTagSetting) {
+        ensureThreadStarterKnown(function() {
+            ensureTsStyles();
+            addTsBadgeToUserElements();
+        });
+    }
+}
             }
 
             const imported = document.importNode(newPost, true);
@@ -890,6 +911,162 @@ function getThreadInfo(){
         //console.log("lowestPageLoaded:"+lowestPageLoaded);
     }
 };
+
+function loadTsCache(callback) {
+    try {
+        if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+            chrome.storage.local.get('fbqolTsCache', (res) => {
+                tsCache = res.fbqolTsCache || {};
+                callback(tsCache);
+            });
+        } else if (typeof browser !== 'undefined' && browser.storage?.local) {
+            browser.storage.local.get('fbqolTsCache').then((res) => {
+                tsCache = res.fbqolTsCache || {};
+                callback(tsCache);
+            });
+        } else {
+            tsCache = {};
+            callback(tsCache);
+        }
+    } catch (e) {
+        tsCache = {};
+        callback(tsCache);
+    }
+}
+
+function saveTsCache(callback) {
+    try {
+        const data = { fbqolTsCache: tsCache || {} };
+        if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+            chrome.storage.local.set(data, () => callback && callback());
+        } else if (typeof browser !== 'undefined' && browser.storage?.local) {
+            browser.storage.local.set(data).then(() => callback && callback());
+        } else {
+            callback && callback();
+        }
+    } catch (e) {
+        // silently ignore
+        callback && callback();
+    }
+}
+
+function getEarliestPostUsernameFromDOM() {
+    try {
+        const posts = Array.from(document.querySelectorAll('div.post'));
+        if (!posts.length) return null;
+        const first = posts.reduce((acc, el) => {
+            const id = parseInt(el.getAttribute('data-postid') || "0", 10);
+            if (!acc) return el;
+            const accId = parseInt(acc.getAttribute('data-postid') || "0", 10);
+            return (id && (!accId || id < accId)) ? el : acc;
+        }, null);
+        if (!first) return null;
+        const userEl = first.querySelector('.post-user-username.dropdown-toggle, .post-user-username');
+        if (!userEl) return null;
+        const name = (userEl.textContent || "").trim();
+        return name || null;
+    } catch(e) {
+        return null;
+    }
+}
+
+function addTsBadgeToUserElements() {
+    if (!threadStarterName) return;
+    const userEls = document.querySelectorAll('.post-user-username.dropdown-toggle, .post-user-username');
+    userEls.forEach(el => {
+        const name = (el.textContent || "").trim();
+        if (name === threadStarterName) {
+            if (!el.parentElement.querySelector('.fbqol-ts-badge')) {
+                const span = document.createElement('span');
+                span.className = 'fbqol-ts-badge';
+                span.textContent = ' (ts)';
+                span.style.fontWeight = 'bold';
+                span.style.opacity = '0.7';
+
+                if (el.nextSibling) {
+                    el.parentElement.insertBefore(span, el.nextSibling);
+                } else {
+                    el.parentElement.appendChild(span);
+                }
+            }
+        }
+    });
+}
+
+function ensureTsStyles() {
+    if (document.getElementById('fbqol-ts-style')) return;
+    const style = document.createElement('style');
+    style.id = 'fbqol-ts-style';
+    style.textContent = '.fbqol-ts-badge{margin-left:4px;}';
+    document.head.appendChild(style);
+}
+
+function ensureThreadStarterKnown(callback) {
+    if (!threadStarterTagSetting) { callback && callback(); return; }
+    if (!threadId || !threadId.startsWith('/t')) { 
+        if (typeof getThreadInfo === 'function') { try{ getThreadInfo(); }catch(e){} }
+    }
+    if (threadStarterName) { callback && callback(); return; }
+
+    function afterCacheLoaded() {
+        if (tsCache && tsCache[threadId]) {
+            threadStarterName = tsCache[threadId];
+            callback && callback();
+            return;
+        }
+
+        const domName = getEarliestPostUsernameFromDOM();
+        if (domName) {
+            threadStarterName = domName;
+            tsCache[threadId] = domName;
+            saveTsCache();
+            callback && callback();
+            return;
+        }
+
+        if (tsFetchInProgress) {
+            setTimeout(() => ensureThreadStarterKnown(callback), 300);
+            return;
+        }
+        tsFetchInProgress = true;
+
+        const page1Url = 'https://www.flashback.org' + threadId + 'p1';
+        try {
+            if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+                chrome.runtime.sendMessage({ message: 'fetchSite', url: page1Url }, (response) => {
+                    tsFetchInProgress = false;
+                    if (response && response.response) {
+                        try {
+                            const parser = new DOMParser();
+                            const doc = parser.parseFromString(response.response, 'text/html');
+                            const firstPost = doc.querySelector('div#posts div.post');
+                            const userEl = firstPost ? firstPost.querySelector('.post-user-username.dropdown-toggle, .post-user-username') : null;
+                            const name = userEl ? (userEl.textContent || '').trim() : null;
+                            if (name) {
+                                threadStarterName = name;
+                                tsCache[threadId] = name;
+                                saveTsCache();
+                            }
+                        } catch(e){}
+                    }
+                    callback && callback();
+                });
+            } else {
+                tsFetchInProgress = false;
+                callback && callback();
+            }
+        } catch (e) {
+            tsFetchInProgress = false;
+            callback && callback();
+        }
+    }
+
+    if (tsCache === null) {
+        loadTsCache(afterCacheLoaded);
+    } else {
+        afterCacheLoaded();
+    }
+}
 
 function initiatePageLoadForward(){
     // extra guard to avoid duplicate initiations
@@ -1180,7 +1357,6 @@ function fixMultiQuote() {
 
             let qpostids = getCookie("qpostids") ? getCookie("qpostids") + "," : "";
             let postIdsArray = qpostids.split(",");
-
 
             postIdsArray = postIdsArray.filter(id => !(postMessage.classList.contains("quotem") && id == postId));
 
