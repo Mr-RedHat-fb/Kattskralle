@@ -31,6 +31,9 @@ let ignoreraSetting = false;
 let previewsSetting = false;
 let infiniteScrollSetting = false;
 let bypassLeavingSetting = false;
+let showTsSetting = false;
+let threadTS = "";
+let markReadThreadsSetting = false;
 const fetchQueue = [];
 let isFetching = false;
 let scrollTimeout;
@@ -62,7 +65,9 @@ function ensureDefaultSettings(callback) {
         'Ignorera': true,
         'Previews': true,
         'Infinite Scroll': true,
-        'Bypass Leaving Site': true
+        'Bypass Leaving Site': true,
+        'Visa Trådskapare(TS)': true,
+        'Markera visade trådar': true
     };
 
     function saveDefaultsToChrome() {
@@ -118,8 +123,10 @@ function applySettings(settings) {
     previewsSetting = !!settings['Previews'];
     infiniteScrollSetting = !!settings['Infinite Scroll'];
     bypassLeavingSetting = !!settings['Bypass Leaving Site'];
+    showTsSetting = !!settings['Visa Trådskapare(TS)'];
+    markReadThreadsSetting = !!settings['Markera visade trådar'];
 
-    if (!infiniteScrollSetting && !previewsSetting && !ignoreraSetting && !bypassLeavingSetting) {
+    if (!infiniteScrollSetting && !previewsSetting && !ignoreraSetting && !bypassLeavingSetting && !showTsSetting && !markReadThreadsSetting) {
         return;// Early exit if all settings are false
     }
     main();//only call main if any settings are activated. 
@@ -175,6 +182,9 @@ function findPosts(){
             if (previewsSetting===true){
                 addPreviewsToPosts();
             }
+            if (showTsSetting === true && threadId && threadTS) {
+                markTSPostsInDom();
+            };
         })
     }
 }
@@ -682,7 +692,7 @@ function processFetchQueue() {
 
     try {
         if (!chrome.runtime || !chrome.runtime.sendMessage) {
-            console.warn("chrome.runtime.sendMessage not available. Re-queueing:", url);
+            //console.warn("chrome.runtime.sendMessage not available. Re-queueing:", url);
             setTimeout(() => fetchPostsFromPage(url), 1000);
             isFetching = false;
             return;
@@ -692,7 +702,7 @@ function processFetchQueue() {
             isFetching = false;
 
             if (chrome.runtime.lastError) {
-                console.warn("sendMessage failed:", chrome.runtime.lastError.message);
+                //console.warn("sendMessage failed:", chrome.runtime.lastError.message);
                 setTimeout(() => fetchPostsFromPage(url), 1000);
                 return;
             }
@@ -700,14 +710,14 @@ function processFetchQueue() {
             if (response && response.response) {
                 addPostsToDom(response.response);
             } else {
-                console.warn("No response received for", url);
+                //console.warn("No response received for", url);
                 setTimeout(() => fetchPostsFromPage(url), 1000);
             }
 
             processFetchQueue();
         });
     } catch (e) {
-        console.error("sendMessage threw:", e);
+        //console.error("sendMessage threw:", e);
         isFetching = false;
         setTimeout(() => fetchPostsFromPage(url), 1000);
     }
@@ -736,6 +746,7 @@ function sortPosts(){
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    
     if (request.message === "parseHTML") {
         const parser = new DOMParser();
         const doc = parser.parseFromString(request.html, 'text/html');
@@ -1153,7 +1164,7 @@ function getCookie(name) {
         ?.split("=")[1] || "";
 }
 
-//this new version uses Max-Age instead of Expires, and adds SameSite and Secure attributes - Thank you Mr.RedHat for the suggestion!
+//this version uses Max-Age instead of Expires, and adds SameSite and Secure attributes - Thank you Mr.RedHat for the suggestion!
 function setCookie(name, value, days) {
     let maxAge = "";
     if (days) {
@@ -1225,6 +1236,230 @@ function fixMultiQuote() {
     document._multiQuoteObserver = observer;
 }
 
+function loadSaveThreadAndTS() {
+    threadId=""
+    const threadInfoElement = document.querySelector('.input-page-jump');
+    if (threadInfoElement) {
+        threadId = threadInfoElement.getAttribute('data-url');
+    }
+
+    if (!threadId) {
+        const titleLink = document.querySelector('.page-title a[href]');
+        if (titleLink) {
+            threadId = titleLink.getAttribute('href');
+        }
+    }
+
+    if (!threadId) {
+        const metaOgUrl = document.querySelector('meta[property="og:url"]');
+        if (metaOgUrl) {
+            const ogContent = metaOgUrl.getAttribute('content');
+            const match = ogContent?.match(/\/t\d+/);
+            if (match) threadId = match[0];
+        }
+    }
+
+    if (!threadId || !threadId.startsWith('/t')) {
+        threadId = "";
+    }
+
+    if (!threadId) return;
+
+    chrome.storage.sync.get(['userStorageFbqolThreadsAndTS'], (result) => {
+        const storedList = result.userStorageFbqolThreadsAndTS || [];
+        handleThreadAndTS(storedList, threadId);
+    });
+
+    function handleThreadAndTS(storedList, threadId) {
+        const entry = storedList.find(item => item.threadId === threadId);
+        if (entry) {
+            console.log('Found existing entry for threadId:', threadId, 'TS:', entry.TS);
+            threadTS = entry.TS;
+        }
+
+        if (!threadTS) {
+            //console.log('No TS found for threadId:', threadId, '— checking DOM.');
+            const firstPostAnchor = document.querySelector('a[name="1"]');
+            const postElement = firstPostAnchor?.closest('.post');
+            const userElement = postElement?.querySelector('.post-user-username');
+
+            if (userElement) {
+                threadTS = userElement.textContent.trim();
+                console.log('Found thread starter (TS) in DOM:', threadTS);
+                saveThreadTS(threadId, threadTS, storedList);
+                if (showTsSetting === true) markTSPostsInDom();
+                return;
+            }
+        }
+
+        // --- If still not found, ask service worker ---
+        if (!threadTS) {
+            console.log('TS not found in DOM — requesting via service worker...');
+            chrome.runtime.sendMessage({ action: 'fetchThreadTS', threadId }, (response) => {
+                if (!response) {
+                    console.log("No response from background.");
+                    return;
+                }
+
+                if (response.error) {
+                    console.log("Background error fetching thread:", response.error);
+                    return;
+                }
+
+                if (!response.html) {
+                    console.log("Background returned no html for thread:", threadId);
+                    return;
+                }
+
+                try {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(response.html, "text/html");
+
+                    const firstPostAnchor = doc.querySelector('a[name="1"]');
+                    const postElement = firstPostAnchor?.closest?.('.post');
+                    const userElement = postElement?.querySelector?.('.post-user-username');
+
+                    if (userElement && userElement.textContent) {
+                        const fetchedThreadTS = userElement.textContent.trim();
+                        console.log("Got TS from fetched HTML:", fetchedThreadTS);
+                        threadTS = fetchedThreadTS;
+                        chrome.storage.sync.get(['userStorageFbqolThreadsAndTS'], (result) => {
+                            const storedList = result.userStorageFbqolThreadsAndTS || [];
+                            if (!storedList.some(item => item.threadId === threadId)) {
+                                const updatedList = [...storedList, { threadId, TS: threadTS }];
+                                chrome.storage.sync.set({ userStorageFbqolThreadsAndTS: updatedList }, () => {
+                                    console.log('Saved threadId + TS to sync storage:', { threadId, TS: threadTS });
+                                    chrome.storage.local.set({ userStorageFbqolThreadsAndTS: updatedList }, () => {
+                                        console.log('Saved threadId + TS to local storage as well.');
+                                    });
+                                });
+                            }
+                        });
+
+                        if (showTsSetting === true) {
+                            markTSPostsInDom();
+                        }
+                    } else {
+                        console.warn("Could not find thread starter username in fetched HTML for", threadId);
+                    }
+                } catch (err) {
+                    console.error("Error parsing fetched HTML:", err);
+                }
+            });
+        }
+
+        if (showTsSetting === true && threadTS) {
+            markTSPostsInDom();
+        }
+    }
+
+    function saveThreadTS(threadId, threadTS, storedList) {
+        const exists = storedList.some(item => item.threadId === threadId);
+        if (exists) return;
+
+        const updatedList = [...storedList, { threadId, TS: threadTS }];
+
+        chrome.storage.sync.set({ userStorageFbqolThreadsAndTS: updatedList }, () => {
+
+            // Also save to local
+            chrome.storage.local.set({ userStorageFbqolThreadsAndTS: updatedList }, () => {
+            });
+        });
+    }
+}
+
+function markTSPostsInDom() {
+    if (!threadTS) return;
+
+    const usernameElements = document.querySelectorAll('.post-user-username');
+
+    usernameElements.forEach(userEl => {
+        const username = userEl.textContent.trim();
+        const postRow = userEl.closest('.post-row');
+        const postLeft = userEl.closest('.post-col.post-left');
+        const postRight = postRow?.querySelector('.post-col.post-right');
+        if (!postRow || !postLeft || !postRight) return;
+
+        let tsBadge = postLeft.querySelector('.ts-badge');
+
+        if (username === threadTS) {
+            postRight.style.backgroundColor = "rgba(214, 211, 6, 0.05)";
+            postRight.style.borderRadius = "6px";
+            postRight.style.transition = "all 0.3s ease";
+
+            if (!tsBadge) {
+                tsBadge = document.createElement('div');
+                tsBadge.className = 'ts-badge';
+                tsBadge.textContent = "TS";
+                tsBadge.style.position = "absolute";
+                tsBadge.style.bottom = "4px";
+                tsBadge.style.right = "4px";
+                tsBadge.style.padding = "1px 3px";
+                tsBadge.style.fontSize = "10px";
+                tsBadge.style.fontWeight = "bold";
+                tsBadge.style.color = "#000";
+                tsBadge.style.backgroundColor = "yellow";
+                tsBadge.style.border = "0.5px solid #ccc";
+                tsBadge.style.borderRadius = "2px";
+                tsBadge.style.pointerEvents = "none";
+
+                if (getComputedStyle(postLeft).position === "static") {
+                    postLeft.style.position = "relative";
+                }
+
+                postLeft.appendChild(tsBadge);
+            }
+        } else {
+            // Reset non-TS posts
+            postRight.style.backgroundColor = "";
+            postRight.style.borderRadius = "";
+            if (tsBadge) tsBadge.remove();
+        }
+    });
+}
+
+function highlightStoredThreads() {
+    const threadElements = document.querySelectorAll(
+        '.thread-title, a[id^="thread_title_"]'
+    );
+
+    if (threadElements.length === 0) {
+        //console.warn('No thread-title or id="thread_title_*" elements found.');
+        return;
+    }
+
+    const getStorage = (callback) => {
+        try {
+            chrome.storage.sync.get(['userStorageFbqolThreadsAndTS'], (result) => {
+                callback(result.userStorageFbqolThreadsAndTS || []);
+            });
+        } catch (error) {
+            browser.storage.local.get(['userStorageFbqolThreadsAndTS']).then((result) => {
+                callback(result.userStorageFbqolThreadsAndTS || []);
+            });
+        }
+    };
+
+    getStorage((storedList) => {
+        if (!Array.isArray(storedList)) {
+            return;
+        }
+
+        threadElements.forEach((el) => {
+            const threadHref = el.getAttribute('href');
+            if (!threadHref) return;
+
+            const match = storedList.find(item => item.threadId === threadHref);
+
+            if (match) {
+                el.style.backgroundColor = 'rgba(0, 120, 255, 0.2)'; // light blue background
+                el.style.borderRadius = '5px';
+                el.style.padding = '2px 4px';
+            }
+        });
+    });
+}
+
 let fbqolFirstLoad = true;
 function main(){
     if(bypassLeavingSetting){try{const u=new URLSearchParams(location.search).get('u');if(location.pathname.endsWith('/leave.php')&&u){location.replace(decodeURIComponent(u));return}}catch(e){}}
@@ -1240,6 +1475,13 @@ function main(){
                 try {
                     if(bypassLeavingSetting){rewriteLeaveLinks()}
                     findPosts();
+                    // Save threadId and TS using service worker if either of the settings are enabled.
+                    if (showTsSetting === true || markReadThreadsSetting === true) {
+                        loadSaveThreadAndTS();
+                    } // 251013
+                    if (markReadThreadsSetting === true) {
+                        highlightStoredThreads()
+                    }
                 } catch(error){
                     //console.log('KATTSKRÄLLE:'+error);
                 }

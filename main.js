@@ -23,7 +23,9 @@ function ensureDefaultSettings(callback) {
         'Ignorera': true,
         'Previews': true,
         'Infinite Scroll': true,
-        'Bypass Leaving Site': true
+        'Bypass Leaving Site': true,
+        'Visa Trådskapare(TS)': true,
+        'Markera visade trådar': true
     };
 
     function saveDefaultsToChrome() {

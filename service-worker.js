@@ -16,31 +16,41 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-// service-worker.js
+// ---------------------------------------------------------------
+// --- Queue & Rate-Limiting System for fetchSite requests -------
+// ---------------------------------------------------------------
 
-// --- Queue & rate-limiting ---
 const requestQueue = [];
 let activeRequests = 0;
 const MAX_REQUESTS = 10;
 const TIME_WINDOW = 30 * 1000; // 30 seconds
 let firstRequestTime = null;
 
-// --- Message listener ---
+// --- Main message listener ---
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.message === "fetchSite") {
-        const requestData = { url: request.url, sender, sendResponse };
-        enqueueRequest(requestData);
-        return true; // Keep channel open for async response
+        enqueueRequest({ url: request.url, sender, sendResponse });
+        return true; // async response
     }
+
+    if (request.action === "fetchThreadTS") {
+        handleFetchThreadTS({ threadId: request.threadId, sendResponse });
+        return true; // async response
+    }
+
+    // Unknown message → ignore
+    return false;
 });
 
-// --- Enqueue request ---
+// ---------------------------------------------------------------
+// --- fetchSite queue handling ----------------------------------
+// ---------------------------------------------------------------
+
 function enqueueRequest(requestData) {
     requestQueue.push(requestData);
     processQueue();
 }
 
-// --- Process queue with rate limiting ---
 function processQueue() {
     if (requestQueue.length === 0) return;
 
@@ -63,7 +73,10 @@ function processQueue() {
     }
 }
 
-// --- Handle individual fetch ---
+// ---------------------------------------------------------------
+// --- Handle "fetchSite" request (original logic) ---------------
+// ---------------------------------------------------------------
+
 function handleRequest({ url, sender, sendResponse }) {
     let responded = false;
     const safeSendResponse = (data) => {
@@ -72,8 +85,6 @@ function handleRequest({ url, sender, sendResponse }) {
             sendResponse(data);
         }
     };
-
-    //console.log("Fetching site:", url);
 
     fetch(url)
         .then(response => {
@@ -92,19 +103,16 @@ function handleRequest({ url, sender, sendResponse }) {
 
                 const tabId = tabs[0].id;
 
-                // Try sending message, inject content script if missing
+                // Try sending message to content script
                 chrome.tabs.sendMessage(tabId, { message: "parseHTML", html }, (response) => {
                     if (chrome.runtime.lastError) {
-                        //console.warn("sendMessage failed, trying to inject content script:", chrome.runtime.lastError.message);
-
-                        // Inject content script dynamically
+                        // If sendMessage failed, inject content script dynamically
                         chrome.scripting.executeScript({
                             target: { tabId },
                             files: ['contentScript.js']
                         }, () => {
                             chrome.tabs.sendMessage(tabId, { message: "parseHTML", html }, (resp) => {
                                 if (chrome.runtime.lastError) {
-                                    //console.error("sendMessage after injection failed:", chrome.runtime.lastError.message);
                                     safeSendResponse({ response: "Error: " + chrome.runtime.lastError.message });
                                 } else {
                                     safeSendResponse(resp);
@@ -118,7 +126,37 @@ function handleRequest({ url, sender, sendResponse }) {
             });
         })
         .catch(error => {
-            //console.error('Error fetching site:', error);
             safeSendResponse({ response: "Could not fetch page: " + error.message });
+        });
+}
+
+// ---------------------------------------------------------------
+// --- Handle "fetchThreadTS" request -----------------------------
+// ---------------------------------------------------------------
+
+function handleFetchThreadTS({ threadId, sendResponse }) {
+    if (!threadId) {
+        sendResponse({ error: "No threadId provided." });
+        return;
+    }
+
+    const url = `https://www.flashback.org/${threadId}`;
+    console.log("Fetching thread for TS:", url);
+
+    fetch(url)
+        .then(response => {
+            if (!response.ok) throw new Error("Network response was not ok");
+            return response.arrayBuffer();
+        })
+        .then(arrayBuffer => {
+            const decoder = new TextDecoder('iso-8859-1');
+            const html = decoder.decode(arrayBuffer);
+
+            // ✅ Just return the HTML to the content script
+            sendResponse({ threadId, html });
+        })
+        .catch(error => {
+            console.error("Error fetching thread TS:", error);
+            sendResponse({ error: error.message });
         });
 }
