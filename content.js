@@ -1273,7 +1273,7 @@ function loadSaveThreadAndTS() {
     function handleThreadAndTS(storedList, threadId) {
         const entry = storedList.find(item => item.threadId === threadId);
         if (entry) {
-            console.log('Found existing entry for threadId:', threadId, 'TS:', entry.TS);
+            //console.log('Found existing entry for threadId:', threadId, 'TS:', entry.TS);
             threadTS = entry.TS;
         }
 
@@ -1297,17 +1297,17 @@ function loadSaveThreadAndTS() {
             console.log('TS not found in DOM — requesting via service worker...');
             chrome.runtime.sendMessage({ action: 'fetchThreadTS', threadId }, (response) => {
                 if (!response) {
-                    console.log("No response from background.");
+                    //console.log("No response from background.");
                     return;
                 }
 
                 if (response.error) {
-                    console.log("Background error fetching thread:", response.error);
+                    //console.log("Background error fetching thread:", response.error);
                     return;
                 }
 
                 if (!response.html) {
-                    console.log("Background returned no html for thread:", threadId);
+                    //console.log("Background returned no html for thread:", threadId);
                     return;
                 }
 
@@ -1340,10 +1340,10 @@ function loadSaveThreadAndTS() {
                             markTSPostsInDom();
                         }
                     } else {
-                        console.warn("Could not find thread starter username in fetched HTML for", threadId);
+                        //console.warn("Could not find thread starter username in fetched HTML for", threadId);
                     }
                 } catch (err) {
-                    console.error("Error parsing fetched HTML:", err);
+                    //console.error("Error parsing fetched HTML:", err);
                 }
             });
         }
@@ -1417,42 +1417,87 @@ function markTSPostsInDom() {
         }
     });
 }
-
+window.addEventListener('pageshow', (event) => {
+    if (event.persisted) {
+        // Page restored from cache (Back/Forward)
+        try {
+            reInitPlugin(); // or just highlightStoredThreads()
+        } catch (e) {
+            console.error('Error re-initializing plugin on back:', e);
+        }
+    }
+});
 function highlightStoredThreads() {
+    //console.log("🟦 highlightStoredThreads() called");
+
     const threadElements = document.querySelectorAll(
         '.thread-title, a[id^="thread_title_"]'
     );
+    //console.log("🟦 Found", threadElements.length, "thread elements");
 
     if (threadElements.length === 0) {
-        //console.warn('No thread-title or id="thread_title_*" elements found.');
+        //console.warn('⚠️ No thread-title elements found on this page.');
         return;
     }
 
     const getStorage = (callback) => {
+        const runCallback = (data) => {
+            if (typeof callback === 'function') {
+                callback(data || []);
+            }
+        };
+
         try {
-            chrome.storage.sync.get(['userStorageFbqolThreadsAndTS'], (result) => {
-                callback(result.userStorageFbqolThreadsAndTS || []);
-            });
+            // Prefer Chrome sync storage if available
+            if (typeof chrome !== 'undefined' && chrome.storage?.sync?.get) {
+                chrome.storage.sync.get(['userStorageFbqolThreadsAndTS'], (result) => {
+                    if (chrome.runtime?.lastError) {
+                        //console.warn('⚠️ chrome.storage.sync error:', chrome.runtime.lastError);
+                        // fallback to chrome.storage.local
+                        if (chrome.storage?.local?.get) {
+                            chrome.storage.local.get(['userStorageFbqolThreadsAndTS'], (res) => {
+                                runCallback(res.userStorageFbqolThreadsAndTS || []);
+                            });
+                        } else {
+                            runCallback([]);
+                        }
+                    } else {
+                        runCallback(result.userStorageFbqolThreadsAndTS || []);
+                    }
+                });
+            } 
+            // fallback to local storage
+            else if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
+                chrome.storage.local.get(['userStorageFbqolThreadsAndTS'], (result) => {
+                    runCallback(result.userStorageFbqolThreadsAndTS || []);
+                });
+            } 
+            else {
+                //console.warn('⚠️ No storage API available');
+                runCallback([]);
+            }
         } catch (error) {
-            browser.storage.local.get(['userStorageFbqolThreadsAndTS']).then((result) => {
-                callback(result.userStorageFbqolThreadsAndTS || []);
-            });
+            //console.error('❌ Storage retrieval failed:', error);
+            runCallback([]);
         }
     };
 
     getStorage((storedList) => {
         if (!Array.isArray(storedList)) {
+            //console.warn("⚠️ Stored list is not an array:", storedList);
             return;
         }
+
+        //console.log("📋 Stored thread IDs:", storedList.map(i => i.threadId));
 
         threadElements.forEach((el) => {
             const threadHref = el.getAttribute('href');
             if (!threadHref) return;
 
             const match = storedList.find(item => item.threadId === threadHref);
-
             if (match) {
-                el.style.backgroundColor = 'rgba(0, 120, 255, 0.2)'; // light blue background
+                //console.log("✅ Highlighting thread:", threadHref, "→", match.TS);
+                el.style.backgroundColor = 'rgba(188, 196, 205, 0.58)'; //grey
                 el.style.borderRadius = '5px';
                 el.style.padding = '2px 4px';
             }
@@ -1463,7 +1508,12 @@ function highlightStoredThreads() {
 let fbqolFirstLoad = true;
 function main(){
     if(bypassLeavingSetting){try{const u=new URLSearchParams(location.search).get('u');if(location.pathname.endsWith('/leave.php')&&u){location.replace(decodeURIComponent(u));return}}catch(e){}}
-
+     if (showTsSetting === true || markReadThreadsSetting === true) {
+        loadSaveThreadAndTS();
+    } // 251013
+    if (markReadThreadsSetting === true) {
+        highlightStoredThreads()
+    }
     getUsers(function(retrievedUsers) {
         users = retrievedUsers; 
         findPosts();
@@ -1558,6 +1608,9 @@ function main(){
 
 function reInitPlugin() {
     findPosts();
+    if (markReadThreadsSetting === true) {
+        highlightStoredThreads()
+    }
     if (infiniteScrollSetting===true){
         if (!document.getElementById("floatingDiv")) {
             addFloatingPageDiv();
