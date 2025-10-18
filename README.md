@@ -7,11 +7,12 @@
 Kattskrälle är ett Chrome-tillägg som gör Flashback-forum lite trevligare och enklare att använda.  
 
 ### Funktioner
-- 🚫 **Ignorera användare** – döljer inlägg från valfria användare så att du slipper se dem.  
+- 🚫 **Ignorera användare** – döljer inlägg från valfria användare. (Nu även möjligt för inlägg som citerar användaren)
 - 🔄 **Infinite scroll** – ladda in nya sidor automatiskt utan att behöva klicka dig vidare.  
 - ↪️ **Hoppa över bekräftelsesidor** – slipp mellanliggande bekräftelsesidor när du öppnar externa länkar.  
 - 🌟 **Visa Trådskapare (TS)** – markerar trådskaparens inlägg med ljusgul bakgrund.  
 - ✅ **Markera Visade Trådar**– lägger en bakgrundsfärg på redan lästa trådar.
+- 💾 **Spara & ladda utkast** – spara pågående inlägg eller trådar och fortsätt skriva senare.
 - 🖼️ **Förhandsvisa innehåll** – bädda in media direkt i tråden:  
   - Bilder och videofiler från vissa bildlänkar  
   - YouTube-videor  
@@ -51,11 +52,12 @@ Se [LICENSE](LICENSE) för fullständig text.
 Kattskrälle is a Chrome extension that makes the Flashback forum a bit more pleasant and convenient to use.  
 
 ### Features
-- 🚫 **Ignore users** – hide posts from specific users you don’t want to see.  
+- 🚫 **Ignore Users** – hides posts from selected users. (Now also works for posts quoting the user)
 - 🔄 **Infinite scroll** – automatically load new pages without clicking through.  
 - ↪️ **Bypass confirmation sites** – skip intermediate confirmation pages when opening external links.
 - 🌟 **Show Thread Starter (TS)** – highlights the thread starter’s posts with a light yellow background.  
-- ✅ **Mark Viewed Threads** – adds a background color to threads you’ve already visited.    
+- ✅ **Mark Viewed Threads** – adds a background color to threads you’ve already visited.
+- 💾 **Save & Load Drafts** – save your ongoing posts or threads and continue writing later.
 - 🖼️ **previews** – embed media directly in threads:  
   - Images and videos from supported hosts  
   - YouTube videos  
@@ -93,5 +95,6 @@ See [LICENSE](LICENSE) for the full text.
 ![preview](/images/Preview.png) 
 ![Ignore](/images/Ignore.png) 
 ![settings](/images/settings.png)
+
 
 
