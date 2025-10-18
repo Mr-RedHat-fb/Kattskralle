@@ -79,7 +79,9 @@ body{
   white-space: nowrap;
   cursor: pointer;
 }
-
+h3 {
+  margin-left: 5px;
+}
 .header-flex {
   display: flex;
   align-items: center;
