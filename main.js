@@ -27,7 +27,8 @@ function ensureDefaultSettings(callback) {
         'Visa Trådskapare(TS)': true,
         'Markera visade trådar': true,
         'Ignorera även i citat': true,
-        'Spara & ladda utkast': true
+        'Spara & ladda utkast': true,
+        'Sök länkar': true
     };
 
     function saveDefaultsToChrome() {

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Kattskrälle",
   "description": "The FB Forum quality of life plugin.",
-  "version": "1.4",
+  "version": "1.5",
   "action": {
     "default_popup": "index.html",
     "default_icon": {
@@ -36,5 +36,4 @@
       "run_at": "document_start"
     }
   ]
-
 }
