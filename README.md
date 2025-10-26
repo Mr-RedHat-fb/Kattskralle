@@ -4,7 +4,7 @@
 
 ## Svenska / Swedish
 ### Om
-Kattskrälle är ett Chrome-tillägg som gör Flashback-forum lite trevligare och enklare att använda.  
+Kattskrälle är ett webbläsartillägg som gör Flashback-forum lite trevligare och enklare att använda.  
 
 ### Funktioner
 - 🚫 **Ignorera användare** – döljer inlägg från valfria användare. (Nu även möjligt för inlägg som citerar användaren)
@@ -26,7 +26,7 @@ Kattskrälle är ett Chrome-tillägg som gör Flashback-forum lite trevligare oc
 
 **Alternativ B – Installera manuellt**  
 1. Ladda ner projektet som ZIP eller klona repo:t.  
-2. Öppna Chrome och gå till `chrome://extensions/`.  
+2. Öppna Chrome (eller annan Chromium-baserad webbläsare) och gå till `chrome://extensions/`.  
 3. Aktivera **Developer mode** (Utvecklarläge).  
 4. Klicka på **Load unpacked** och välj mappen med tillägget.  
 5. Tillägget aktiveras och fungerar direkt på [Flashback.org](https://www.flashback.org/). 
@@ -72,7 +72,7 @@ Kattskrälle is a Chrome extension that makes the Flashback forum a bit more ple
 
 **Option B – Manual Installation**  
 - Download the project as a ZIP or clone the repo.  
-- Open Chrome and go to `chrome://extensions/`.  
+- Open Chrome (or another Chromium-based browser) and go to `chrome://extensions/`.  
 - Enable **Developer mode**.  
 - Click **Load unpacked** and select the folder containing the extension.  
 - The extension is now active and works on [Flashback.org](https://www.flashback.org/).  
@@ -97,6 +97,7 @@ See [LICENSE](LICENSE) for the full text.
 ![preview](/images/Preview.png) 
 ![Ignore](/images/Ignore.png) 
 ![settings](/images/settings.png)
+
 
 
 
