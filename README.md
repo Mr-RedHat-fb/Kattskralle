@@ -8,7 +8,8 @@ Kattskrälle är ett Chrome-tillägg som gör Flashback-forum lite trevligare oc
 
 ### Funktioner
 - 🚫 **Ignorera användare** – döljer inlägg från valfria användare. (Nu även möjligt för inlägg som citerar användaren)
-- 🔄 **Infinite scroll** – ladda in nya sidor automatiskt utan att behöva klicka dig vidare.  
+- 🔄 **Infinite scroll** – ladda in nya sidor automatiskt utan att behöva klicka dig vidare.
+- 🔍 **Sök länkar** – leta igenom en tråd efter alla länkar och spara resultatet som .txt eller .html-filer.
 - ↪️ **Hoppa över bekräftelsesidor** – slipp mellanliggande bekräftelsesidor när du öppnar externa länkar.  
 - 🌟 **Visa Trådskapare (TS)** – markerar trådskaparens inlägg med ljusgul bakgrund.  
 - ✅ **Markera Visade Trådar**– lägger en bakgrundsfärg på redan lästa trådar.
@@ -53,7 +54,8 @@ Kattskrälle is a Chrome extension that makes the Flashback forum a bit more ple
 
 ### Features
 - 🚫 **Ignore Users** – hides posts from selected users. (Now also works for posts quoting the user)
-- 🔄 **Infinite scroll** – automatically load new pages without clicking through.  
+- 🔄 **Infinite scroll** – automatically load new pages without clicking through.
+- 🔍 **Find links** – scan a thread for all links and save the results to .txt or .html files.
 - ↪️ **Bypass confirmation sites** – skip intermediate confirmation pages when opening external links.
 - 🌟 **Show Thread Starter (TS)** – highlights the thread starter’s posts with a light yellow background.  
 - ✅ **Mark Viewed Threads** – adds a background color to threads you’ve already visited.
@@ -95,6 +97,7 @@ See [LICENSE](LICENSE) for the full text.
 ![preview](/images/Preview.png) 
 ![Ignore](/images/Ignore.png) 
 ![settings](/images/settings.png)
+
 
 
 
