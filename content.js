@@ -1696,7 +1696,7 @@ function addDraftButtonsInlagg() {
         saveBtn.type = 'button';
         saveBtn.className = 'btn btn-info btn-sm';
         saveBtn.id = 'saveDraftButton';
-        saveBtn.innerHTML = '<i class="fa fa-floppy-o"></i> Spara';
+        saveBtn.innerHTML = '<i class="fa fa-floppy-o"></i> Spara utkast';
         saveBtn.style.marginLeft = '8px';
         saveBtn.addEventListener('click', SaveDraftInlagg);
 
@@ -1708,7 +1708,7 @@ function addDraftButtonsInlagg() {
         loadBtn.type = 'button';
         loadBtn.className = 'btn btn-warning btn-sm';
         loadBtn.id = 'loadDraftButton';
-        loadBtn.innerHTML = '<i class="fa fa-upload"></i> Ladda';
+        loadBtn.innerHTML = '<i class="fa fa-upload"></i> Ladda utkast';
         loadBtn.style.marginLeft = '8px';
         loadBtn.addEventListener('click', loadDraftInlagg);
 
@@ -1741,7 +1741,7 @@ function addDraftButtonsThread() {
         saveBtn.type = 'button';
         saveBtn.className = 'btn btn-info btn-sm';
         saveBtn.id = 'saveThreadDraftButton';
-        saveBtn.innerHTML = '<i class="fa fa-floppy-o"></i> Spara';
+        saveBtn.innerHTML = '<i class="fa fa-floppy-o"></i> Spara utkast';
         saveBtn.style.marginLeft = '8px';
         saveBtn.addEventListener('click', SaveDraftThread);
 
@@ -1754,7 +1754,7 @@ function addDraftButtonsThread() {
         loadBtn.type = 'button';
         loadBtn.className = 'btn btn-warning btn-sm';
         loadBtn.id = 'loadThreadDraftButton';
-        loadBtn.innerHTML = '<i class="fa fa-upload"></i> Ladda';
+        loadBtn.innerHTML = '<i class="fa fa-upload"></i> Ladda utkast';
         loadBtn.style.marginLeft = '8px';
         loadBtn.addEventListener('click', loadDraftThread);
 
@@ -2503,12 +2503,11 @@ async function startSearchLinksInThread() {
     function isInsideQuote(el) {
         let node = el;
         while (node && node !== document) {
-            if (node.nodeType === 1) { // ELEMENT_NODE
+            if (node.nodeType === 1) { 
                 const tag = (node.tagName || '').toUpperCase();
                 if (tag === 'BLOCKQUOTE') return true;
                 const cls = node.className || '';
                 if (typeof cls === 'string' && /quote/i.test(cls)) return true;
-                // Flashback-specific classes
                 if (cls.includes('post-bbcode-quote') || cls.includes('post-bbcode-quote-wrapper') || cls.includes('post-clamped-text')) {
                     return true;
                 }
@@ -2523,6 +2522,13 @@ async function startSearchLinksInThread() {
     for (let page = fromPage; page <= toPage; page++) {
         if (searchCancelled) break;
 
+        const kattsDiv = document.querySelector('.kattskralle-search-div');
+        if (!kattsDiv || kattsDiv.offsetParent === null) {
+            searchCancelled = true;
+            if (activityText) activityText.textContent = 'Sökning stoppad (Kattskrälle-fönster stängt).';
+            break;
+        }
+
         const progress = Math.round(((page - fromPage) / totalPages) * 100);
         if (progressBar) progressBar.style.width = `${progress}%`;
         if (activityText) activityText.textContent = `Aktivitet: Söker igenom sida ${page} av ${toPage} efter länkar.`;
@@ -2531,6 +2537,9 @@ async function startSearchLinksInThread() {
         try {
             const response = await fetch(url, { credentials: 'include' });
             if (!response.ok) throw new Error(`Error fetching page ${page}`);
+
+            // 🔹 Debug log for each fetched page
+            //console.log(`Fetched page ${page}: ${url}`);
 
             const arrayBuffer = await response.arrayBuffer();
             const decoder = new TextDecoder('iso-8859-1');
@@ -2563,18 +2572,13 @@ async function startSearchLinksInThread() {
                 anchors.forEach(a => {
                     let href = a.getAttribute('href');
                     if (!href) return;
-
                     if (/^\/p\d+/.test(href)) return;
-
                     href = cleanLeaveLink(href);
-
                     if (hideFlashback && href.includes('flashback.org')) return;
-
                     if (href && !postLinks.includes(href)) postLinks.push(href);
                 });
 
                 if (postLinks.length === 0) return;
-
                 if (shownPosts.has(postId)) return;
                 shownPosts.add(postId);
 
@@ -2594,7 +2598,6 @@ async function startSearchLinksInThread() {
                         const clonedPost = postElement.cloneNode(true);
                         const nestedQuotes = clonedPost.querySelectorAll('.post-bbcode-quote, .post-bbcode-quote-wrapper, .post-clamped-text, blockquote');
                         nestedQuotes.forEach(nq => nq.remove());
-
                         clonedPost.style.border = '1px solid #ddd';
                         clonedPost.style.borderRadius = '6px';
                         clonedPost.style.marginTop = '6px';
@@ -2626,6 +2629,7 @@ async function startSearchLinksInThread() {
     if (activityText) activityText.textContent = `Aktivitet: Klar! Hittade ${hits.length} länkar.`;
     console.log('All links found:', hits);
 }
+
 
 let fbqolFirstLoad = true;
 function main(){
