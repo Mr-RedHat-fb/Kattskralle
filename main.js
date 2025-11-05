@@ -28,7 +28,8 @@ function ensureDefaultSettings(callback) {
         'Markera visade trådar': true,
         'Ignorera även i citat': true,
         'Spara & ladda utkast': true,
-        'Sök länkar': true
+        'Sök länkar': true,
+        'Trådchatt': true
     };
 
     function saveDefaultsToChrome() {
