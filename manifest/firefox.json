@@ -1,0 +1,24 @@
+{
+    "manifest_version": 3,
+    "name": "Kattskrälle",
+    "description": "Flashback forum helper (WIP).",
+    "version": "0.1.0",
+    "background": {
+        "service_worker": "background.js"
+    },
+    "permissions": [
+        "storage"
+    ],
+    "content_scripts": [
+        {
+            "matches": [
+                "https://www.flashback.org/*",
+                "http://www.flashback.org/*"
+            ],
+            "js": [
+                "content.js"
+            ],
+            "run_at": "document_start"
+        }
+    ]
+}
