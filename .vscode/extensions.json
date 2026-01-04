@@ -1,7 +1,6 @@
 {
     "recommendations": [
         "vijaynirmal.chrome-devtools-mcp-relay",
-        "openai.chatgpt",
         "formulahendry.code-runner",
         "leng-z4.chromextnsionsnippets",
         "aaravb.chrome-extension-developer-tools",
@@ -33,6 +32,13 @@
         "ms-vscode.remote-explorer",
         "ms-vscode.remote-repositories",
         "wayou.vscode-todo-highlight",
-        "gruntfuggly.todo-tree"
+        "gruntfuggly.todo-tree",
+        "anthropic.claude-code",
+        "googlecloudtools.cloudcode",
+        "golang.go",
+        "googlecloudtools.firebase-dataconnect-vscode",
+        "ms-azuretools.vscode-docker",
+        "ms-vscode-remote.remote-ssh",
+        "ms-vscode-remote.remote-ssh-edit"
     ]
 }
