@@ -4,7 +4,7 @@
       circleci run release plan \
         --environment-name="staging" \
         --component-name="katten" \
-        --target-version="<some-version-name>"
+        --target-version="${CIRCLE_TAG}"
 # Your job here doing the actual deployment
 - run:
     name: Update a deploy to SUCCESS
