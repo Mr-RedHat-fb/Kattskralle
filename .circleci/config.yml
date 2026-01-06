@@ -13,4 +13,4 @@
 - run:
     name: Update planned deploy to FAILED
     command: circleci run release update --status=FAILED
-    when: on_fail
+    when: on_failure
